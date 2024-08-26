@@ -286,17 +286,25 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
         cluster.provider === Provider.hostinventory ||
         cluster.provider == Provider.baremetal ||
         cluster.provider == Provider.ibmpower ||
-        cluster.provider == Provider.ibmz
+        cluster.provider == Provider.ibmz ||
+        cluster.provider == Provider.kubevirt
       anyUnsupported ||= !isSupported
 
+      let ns = cluster.namespace;
+      // for hosted clusters we should use 'cluster.name' as namespce because
+      // cluster.namespace is hardcoded to 'clusters'
+
       if (isSupported) {
+          if (cluster.isHostedCluster) {
+           ns = cluster.name;
+          }
         // ManagedClusterAddOn resource
         resources.push({
           apiVersion: ManagedClusterAddOnApiVersion,
           kind: ManagedClusterAddOnKind,
           metadata: {
             name: 'submariner',
-            namespace: cluster?.namespace!,
+            namespace: ns,
           },
           spec: {
             installNamespace,
@@ -308,7 +316,7 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
           kind: SubmarinerConfigKind,
           metadata: {
             name: 'submariner',
-            namespace: cluster?.namespace!,
+            namespace: ns,
           },
           spec: {
             gatewayConfig: {
@@ -330,7 +338,7 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
             kind: SecretKind,
             metadata: {
               name: `${cluster.name}-${cluster.provider}-creds`,
-              namespace: cluster.namespace,
+              namespace: ns,
             },
             stringData: {},
             type: 'Opaque',
@@ -343,6 +351,7 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
             cluster.provider !== Provider.baremetal &&
             cluster.provider !== Provider.ibmpower &&
             cluster.provider !== Provider.ibmz &&
+            cluster.provider !== Provider.kubevirt &&
             providerSecretMap[cluster.displayName!] === null
           ) {
             if (cluster.provider === Provider.aws) {
@@ -376,7 +385,8 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
             cluster.provider !== Provider.hostinventory &&
             cluster.provider !== Provider.baremetal &&
             cluster.provider !== Provider.ibmpower &&
-            cluster.provider !== Provider.ibmz
+            cluster.provider !== Provider.ibmz &&
+            cluster.provider !== Provider.kubevirt
           ) {
             // use existing secret name
             if (providerSecretMap[cluster.displayName!]) {
@@ -432,7 +442,7 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
           kind: ManagedClusterAddOnKind,
           metadata: {
             name: 'submariner',
-            namespace: cluster?.namespace!,
+            namespace: ns,
           },
           spec: {
             installNamespace,
@@ -652,6 +662,9 @@ export function InstallSubmarinerForm(props: { availableClusters: Cluster[] }) {
                     return false
                   }
                   if (matchedCluster.provider === Provider.ibm && matchedCluster.distribution?.isManagedOpenShift) {
+                    return false
+                  }
+                  if (matchedCluster.provider === Provider.kubevirt) {
                     return false
                   }
                   return !submarinerConfigProviders.includes(matchedCluster!.provider!)
